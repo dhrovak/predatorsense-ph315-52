@@ -12,6 +12,7 @@ Fan control, turbo and 4-zone keyboard RGB for the **Acer Predator PH315-52**, w
 - Live CPU/GPU temperature and fan speed, with a 60-second chart
 - Fan modes: **Auto**, **Turbo** (both fans at max) or **Custom** (0-100% per fan)
 - Keyboard lighting: static (4 zones), breath, neon, wave, shifting, zoom
+- Keyboard backlight 30-second idle timeout on or off (always lit)
 - Settings persist across reboots and suspend/resume
 - Opens with the PredatorSense key (left of Num Lock) on GNOME
 
@@ -61,6 +62,7 @@ predator-sense fan --cpu 60 --gpu 80
 predator-sense turbo on
 predator-sense rgb wave --speed 5 --brightness 80
 predator-sense rgb static --zones '#ff0000' '#00ff00' '#0000ff' '#ffffff'
+predator-sense kb-timeout off          # keep the keyboard backlight on (on: off after 30 s idle)
 sudo predator-sense verify             # re-run the hardware check
 ```
 

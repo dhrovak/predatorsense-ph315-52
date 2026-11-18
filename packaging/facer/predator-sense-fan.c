@@ -6,6 +6,8 @@
  * value is "auto", "max" or a speed in percent (0-100).
  * /sys/module/facer/parameters/sensors (root only) reports the firmware's own
  * temperature and fan speed readings, "-" when unavailable.
+ * Write 1 or 0 to /sys/module/facer/parameters/kb_timeout to turn the keyboard
+ * backlight's 30 second idle timeout on or off.
  */
 MODULE_VERSION("#VERSION#");
 
@@ -201,3 +203,62 @@ static const struct kernel_param_ops ps_sensors_ops = {
 };
 module_param_cb(sensors, &ps_sensors_ops, NULL, 0400);
 MODULE_PARM_DESC(sensors, "PredatorSense firmware sensor readings (read only)");
+
+/*
+ * Keyboard backlight 30 second idle timeout, through the WMID_GUID3 "set device
+ * status" call PredatorSense uses (hotkey 0x84; byte 5 is the timeout in seconds).
+ * The firmware's read-back is unreliable on the PH315-52, so the last value set is reported.
+ */
+#define PS_SET_DEVICE_STATUS_METHODID	1
+#define PS_KB_TIMEOUT_OFF		0x0000000000088402ULL
+#define PS_KB_TIMEOUT_30S		0x00001E0000088402ULL
+
+static DEFINE_MUTEX(ps_kb_timeout_lock);
+static int ps_kb_timeout_state = -1;
+
+static int ps_kb_timeout_set(const char *val, const struct kernel_param *kp)
+{
+	struct acpi_buffer output = { ACPI_ALLOCATE_BUFFER, NULL };
+	struct acpi_buffer input;
+	acpi_status status;
+	bool on;
+	u64 in;
+
+	if (kstrtobool(val, &on))
+		return -EINVAL;
+	if (!wmi_has_guid(WMID_GUID3))
+		return -ENODEV;
+
+	in = on ? PS_KB_TIMEOUT_30S : PS_KB_TIMEOUT_OFF;
+	input.length = sizeof(in);
+	input.pointer = &in;
+
+	mutex_lock(&ps_kb_timeout_lock);
+	status = wmi_evaluate_method(WMID_GUID3, 0, PS_SET_DEVICE_STATUS_METHODID, &input, &output);
+	kfree(output.pointer);
+	if (ACPI_FAILURE(status)) {
+		mutex_unlock(&ps_kb_timeout_lock);
+		pr_err("kb_timeout: WMI call failed: %s\n", acpi_format_exception(status));
+		return -EIO;
+	}
+	ps_kb_timeout_state = on;
+	mutex_unlock(&ps_kb_timeout_lock);
+	return 0;
+}
+
+static int ps_kb_timeout_get(char *buffer, const struct kernel_param *kp)
+{
+	int state;
+
+	mutex_lock(&ps_kb_timeout_lock);
+	state = ps_kb_timeout_state;
+	mutex_unlock(&ps_kb_timeout_lock);
+	return scnprintf(buffer, PAGE_SIZE, "%s\n", state < 0 ? "-" : state ? "1" : "0");
+}
+
+static const struct kernel_param_ops ps_kb_timeout_ops = {
+	.set = ps_kb_timeout_set,
+	.get = ps_kb_timeout_get,
+};
+module_param_cb(kb_timeout, &ps_kb_timeout_ops, NULL, 0644);
+MODULE_PARM_DESC(kb_timeout, "Keyboard backlight turns off after 30 s idle: 1 or 0 (\"-\" until set)");

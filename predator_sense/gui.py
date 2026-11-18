@@ -10,7 +10,7 @@ from PyQt6.QtCore import QObject, QPointF, Qt, QThread, QTimer, pyqtSignal, pyqt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from PyQt6.QtWidgets import (
-    QApplication, QButtonGroup, QColorDialog, QComboBox, QFrame, QGridLayout, QGroupBox,
+    QApplication, QButtonGroup, QCheckBox, QColorDialog, QComboBox, QFrame, QGridLayout, QGroupBox,
     QHBoxLayout, QLabel, QPushButton, QSlider, QVBoxLayout, QWidget,
 )
 
@@ -305,6 +305,11 @@ class Window(QWidget):
         self.direction.currentIndexChanged.connect(self._rgb_changed)
         grid.addWidget(self.direction_label, 5, 0)
         grid.addWidget(self.direction, 5, 1)
+
+        self.kb_timeout = QCheckBox("Turn off after 30 seconds idle")
+        self.kb_timeout.setChecked(True)
+        self.kb_timeout.toggled.connect(lambda on: self._send("set_kb_timeout", on=on))
+        grid.addWidget(self.kb_timeout, 6, 0, 1, 2)
         self._update_rgb_visibility()
         return self.kb_box
 
@@ -361,7 +366,11 @@ class Window(QWidget):
 
         self.fan_box.setEnabled(bool(data["fan_control"] and data["sensors"]))
         self.kb_box.setEnabled(bool(data["keyboard"]))
+        self.kb_timeout.setEnabled(bool(data["kb_timeout_control"]))
         if not self._rgb_loaded:
+            self.kb_timeout.blockSignals(True)
+            self.kb_timeout.setChecked(bool(data["kb_timeout"]))
+            self.kb_timeout.blockSignals(False)
             self._load_rgb(data["rgb"])
 
         s = data.get("sensors")

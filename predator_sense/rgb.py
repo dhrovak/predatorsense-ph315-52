@@ -5,6 +5,7 @@ import re
 
 DYNAMIC_DEVICE = "/dev/acer-gkbbl-0"
 STATIC_DEVICE = "/dev/acer-gkbbl-static-0"
+TIMEOUT_PARAM = "/sys/module/facer/parameters/kb_timeout"
 
 EFFECTS = {"static": 0, "breath": 1, "neon": 2, "wave": 3, "shifting": 4, "zoom": 5}
 EFFECTS_WITH_COLOR = ("breath", "shifting", "zoom")
@@ -95,12 +96,31 @@ def zone_payload(zone_index, color):
 
 
 class Keyboard:
-    def __init__(self, dynamic_device=DYNAMIC_DEVICE, static_device=STATIC_DEVICE):
+    def __init__(self, dynamic_device=DYNAMIC_DEVICE, static_device=STATIC_DEVICE, timeout_param=TIMEOUT_PARAM):
         self.dynamic_device = dynamic_device
         self.static_device = static_device
+        self.timeout_param = timeout_param
 
     def available(self):
         return os.path.exists(self.dynamic_device) and os.path.exists(self.static_device)
+
+    def timeout_available(self):
+        return os.path.exists(self.timeout_param)
+
+    def set_timeout(self, on):
+        """Turn the backlight's 30 second idle timeout on or off."""
+        if not isinstance(on, bool):
+            raise ValueError("on must be true or false")
+        if not self.timeout_available():
+            raise OSError("The keyboard backlight timeout needs the PredatorSense build of the facer module. "
+                          "Re-run: sudo ./install.sh")
+        fd = os.open(self.timeout_param, os.O_WRONLY | os.O_TRUNC)
+        try:
+            os.write(fd, b"1\n" if on else b"0\n")
+        except OSError as e:
+            raise OSError(f"The firmware rejected the keyboard timeout setting ({e.strerror})") from e
+        finally:
+            os.close(fd)
 
     @staticmethod
     def _write(path, payload):

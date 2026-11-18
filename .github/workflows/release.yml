@@ -22,7 +22,6 @@ jobs:
         uses: ncipollo/release-action@v1        # ← this line changes
         with:
           tag: v${{ github.run_number }}
-          name: Release ${{ github.event.pull_request.number }}
-          body: ${{ github.event.pull_request.body }}
+          name: PredatorSense v${{ github.event.pull_request.number }}
           generateReleaseNotes: true
           artifacts: "dist/*"                    # optional, skip if no builds   

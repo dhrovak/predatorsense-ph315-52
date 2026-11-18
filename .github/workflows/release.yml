@@ -1,0 +1,28 @@
+name: Auto Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    if: github.event.pull_request.merged
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1        # ← this line changes
+        with:
+          tag: v${{ github.run_number }}
+          name: Release ${{ github.event.pull_request.number }}
+          body: ${{ github.event.pull_request.body }}
+          generateReleaseNotes: true
+          artifacts: "dist/*"                    # optional, skip if no builds   

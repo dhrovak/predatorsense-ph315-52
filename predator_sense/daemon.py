@@ -38,7 +38,7 @@ NOT_ALLOWED = f"Not allowed. Add your user to the '{GROUP}' group, then log out 
 
 log = logging.getLogger("predator-sense")
 
-DEFAULT_STATE = {"fans": {"cpu": "auto", "gpu": "auto"}, "rgb": None}
+DEFAULT_STATE = {"fans": {"cpu": "auto", "gpu": "auto"}, "rgb": None, "kb_timeout": None}
 
 
 def suspend_offset():
@@ -92,6 +92,7 @@ class Service:
         self.state = self._load_state()
         self._fans_pending = False
         self._rgb_pending = False
+        self._kb_timeout_pending = False
         self._suspend_offset = suspend_offset()
 
     # --- persistence -------------------------------------------------------
@@ -105,6 +106,11 @@ class Service:
                 state["fans"][fan] = hardware.parse_fan_setting(saved["fans"][fan])
             if saved.get("rgb") is not None:
                 state["rgb"] = rgb.normalize_settings(saved["rgb"])
+            kb_timeout = saved.get("kb_timeout")
+            if kb_timeout is not None:
+                if not isinstance(kb_timeout, bool):
+                    raise ValueError("kb_timeout must be true or false")
+                state["kb_timeout"] = kb_timeout
         except FileNotFoundError:
             pass
         except (OSError, ValueError, KeyError, TypeError) as e:
@@ -141,6 +147,7 @@ class Service:
         with self.lock:
             self._restore_fans()
             self._restore_rgb()
+            self._restore_kb_timeout()
 
     def _restore_fans(self):
         fans = dict(self.state["fans"])
@@ -168,6 +175,16 @@ class Service:
         except OSError as e:
             log.error("Could not restore keyboard lighting: %s", e)
 
+    def _restore_kb_timeout(self):
+        on = self.state["kb_timeout"]
+        self._kb_timeout_pending = on is not None and not self.keyboard.timeout_available()
+        if on is None or self._kb_timeout_pending:
+            return
+        try:
+            self.keyboard.set_timeout(on)
+        except (OSError, ValueError) as e:
+            log.error("Could not restore the keyboard backlight timeout: %s", e)
+
     def tick(self):
         """Periodic work: re-apply after resume, finish a delayed restore, then the safety check."""
         offset = suspend_offset()
@@ -178,11 +195,14 @@ class Service:
                 log.info("Resumed from suspend; re-applying fan and keyboard settings")
                 self._restore_fans()
                 self._restore_rgb()
+                self._restore_kb_timeout()
             else:
                 if self._fans_pending and self.controller.can_control_fans:
                     self._restore_fans()
                 if self._rgb_pending and self.keyboard.available():
                     self._restore_rgb()
+                if self._kb_timeout_pending and self.keyboard.timeout_available():
+                    self._restore_kb_timeout()
         self.safety_check()
 
     def shutdown(self):
@@ -224,6 +244,7 @@ class Service:
                 "set_fans": self._set_fans,
                 "set_turbo": self._set_turbo,
                 "set_rgb": self._set_rgb,
+                "set_kb_timeout": self._set_kb_timeout,
             }.get(cmd)
             if handler is None:
                 raise ValueError(f"Unknown command: {cmd!r}")
@@ -240,6 +261,9 @@ class Service:
             "fan_control_problem": problem,
             "keyboard": self.keyboard.available(),
             "rgb": self.state["rgb"] or dict(rgb.DEFAULT_SETTINGS),
+            # Unset means the firmware default, which is the 30 second timeout.
+            "kb_timeout": self.state["kb_timeout"] is not False,
+            "kb_timeout_control": self.keyboard.timeout_available(),
             "saved_fans": self.state["fans"],
             "notice": self.notice,
             "sensors": None,
@@ -305,6 +329,16 @@ class Service:
         self.state["rgb"] = settings
         self._save_state()
         return settings
+
+    def _set_kb_timeout(self, request):
+        on = request.get("on")
+        if not isinstance(on, bool):
+            raise ValueError("on must be true or false")
+        self.keyboard.set_timeout(on)
+        self.state["kb_timeout"] = on
+        self._kb_timeout_pending = False
+        self._save_state()
+        return None
 
 
 class _Handler(socketserver.StreamRequestHandler):

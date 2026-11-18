@@ -120,6 +120,23 @@ class KeyboardTests(unittest.TestCase):
         with open(self.dyn, "rb") as f:
             self.assertEqual(f.read(), rgb.effect_payload(s))
 
+    def test_set_timeout(self):
+        param = os.path.join(self.tmp.name, "kb_timeout")
+        kb = rgb.Keyboard(self.dyn, self.sta, param)
+        self.assertFalse(kb.timeout_available())
+        with self.assertRaisesRegex(OSError, "install"):
+            kb.set_timeout(False)
+        with open(param, "w") as f:
+            f.write("-\n")
+        kb.set_timeout(False)
+        with open(param) as f:
+            self.assertEqual(f.read(), "0\n")
+        kb.set_timeout(True)
+        with open(param) as f:
+            self.assertEqual(f.read(), "1\n")
+        with self.assertRaises(ValueError):
+            kb.set_timeout("on")
+
 
 if __name__ == "__main__":
     unittest.main()

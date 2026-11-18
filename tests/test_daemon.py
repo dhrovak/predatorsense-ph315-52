@@ -17,7 +17,9 @@ FINGERPRINT = {"model": "Predator PH315-52", "bios": "V1.12", "facer": "git.e97b
 class FakeKeyboard:
     def __init__(self, available=True):
         self._available = available
+        self._timeout_available = available
         self.applied = []
+        self.timeouts = []
 
     def available(self):
         return self._available
@@ -26,6 +28,14 @@ class FakeKeyboard:
         if not self._available:
             raise OSError("no keyboard")
         self.applied.append(settings)
+
+    def timeout_available(self):
+        return self._timeout_available
+
+    def set_timeout(self, on):
+        if not self._timeout_available:
+            raise OSError("no kb_timeout")
+        self.timeouts.append(on)
 
 
 class ServiceTestCase(unittest.TestCase):
@@ -184,6 +194,49 @@ class ServiceTests(ServiceTestCase):
         self.service().restore()
         self.assertEqual(self.fans.calls, [(55, "max")])
         self.assertEqual(self.keyboard.applied[-1]["effect"], "zoom")
+        self.assertEqual(self.keyboard.timeouts, [])
+
+    def test_kb_timeout_set_persists_and_restores(self):
+        s = self.service()
+        self.assertTrue(s.handle({"cmd": "status"})["data"]["kb_timeout"])
+        self.assertTrue(s.handle({"cmd": "set_kb_timeout", "on": False})["ok"])
+        self.assertEqual(self.keyboard.timeouts, [False])
+        self.assertFalse(s.handle({"cmd": "status"})["data"]["kb_timeout"])
+        for bad in ("off", 0, None):
+            self.assertFalse(s.handle({"cmd": "set_kb_timeout", "on": bad})["ok"], repr(bad))
+        restarted = self.service()
+        restarted.restore()
+        self.assertEqual(self.keyboard.timeouts, [False, False])
+
+    def test_kb_timeout_without_module_support(self):
+        self.keyboard._timeout_available = False
+        s = self.service()
+        self.assertFalse(s.handle({"cmd": "status"})["data"]["kb_timeout_control"])
+        self.assertFalse(s.handle({"cmd": "set_kb_timeout", "on": False})["ok"])
+        self.assertIsNone(s.state["kb_timeout"])
+
+    def test_kb_timeout_restored_when_module_appears_and_after_resume(self):
+        with open(self.state_file, "w") as f:
+            json.dump({"fans": {"cpu": "auto", "gpu": "auto"}, "kb_timeout": False}, f)
+        self.keyboard._timeout_available = False
+        offset = [0.0]
+        with mock.patch.object(daemon, "suspend_offset", lambda: offset[0]):
+            s = self.service()
+            s.restore()
+            s.tick()
+            self.assertEqual(self.keyboard.timeouts, [])
+            self.keyboard._timeout_available = True
+            s.tick()
+            s.tick()
+            self.assertEqual(self.keyboard.timeouts, [False])
+            offset[0] = 300.0
+            s.tick()
+        self.assertEqual(self.keyboard.timeouts, [False, False])
+
+    def test_invalid_kb_timeout_in_state_file_is_ignored(self):
+        with open(self.state_file, "w") as f:
+            json.dump({"fans": {"cpu": "auto", "gpu": "auto"}, "kb_timeout": "no"}, f)
+        self.assertIsNone(self.service().state["kb_timeout"])
 
     def test_restore_raises_low_gpu_speed_without_gpu_temperature(self):
         with open(self.state_file, "w") as f:

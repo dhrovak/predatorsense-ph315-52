@@ -5,7 +5,7 @@ set -euo pipefail
 
 FACER_REPO="https://github.com/JafarAkhondali/acer-predator-turbo-and-rgb-keyboard-linux-module"
 FACER_COMMIT="e97bb6354e4366c0d97121bedec19d536323108d"
-FACER_VERSION="git.e97bb63-ps2"
+FACER_VERSION="git.e97bb63-ps3"
 APP_DIR="/opt/predator-sense"
 GROUP="predatorsense"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -231,5 +231,5 @@ cat <<'EOF'
 
 PredatorSense is installed.
   Open it:   press the PredatorSense key, search for "PredatorSense" in your applications menu, or run: predator-sense
-  Terminal:  predator-sense status | fan auto|max|0-100 | turbo on|off | rgb <effect>
+  Terminal:  predator-sense status | fan auto|max|0-100 | turbo on|off | rgb <effect> | kb-timeout on|off
 EOF

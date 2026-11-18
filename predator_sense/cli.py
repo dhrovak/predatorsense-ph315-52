@@ -25,6 +25,8 @@ def _print_status(data):
     k = data["rgb"]
     print(f"Keyboard:    {k['effect']}, brightness {k['brightness']}%"
           + ("" if data["keyboard"] else " (RGB device not found)"))
+    print(f"Backlight:   {'off after 30 s idle' if data['kb_timeout'] else 'always on'}"
+          + ("" if data["kb_timeout_control"] else " (cannot be changed: reinstall needed)"))
     if data.get("notice"):
         print(f"Notice:      {data['notice']}")
 
@@ -65,6 +67,9 @@ def _build_parser():
     kb.add_argument("--brightness", type=int, help="0-100")
     kb.add_argument("--speed", type=int, help="0-9")
     kb.add_argument("--direction", choices=tuple(rgb.DIRECTIONS))
+
+    timeout = sub.add_parser("kb-timeout", help="turn the keyboard backlight off after 30 s idle (on) or keep it lit (off)")
+    timeout.add_argument("state", choices=("on", "off"))
 
     sub.add_parser("verify", help="(root) check the hardware and unlock fan control").add_argument(
         "--if-needed", action="store_true", help="skip if the check already passed for this BIOS and module")
@@ -123,6 +128,8 @@ def main(argv=None):
                 if args.effect == "static" and not args.zones:
                     settings["zones"] = [args.color] * rgb.ZONES
             request("set_rgb", settings=settings)
+        elif cmd == "kb-timeout":
+            request("set_kb_timeout", on=args.state == "on")
     except ServiceError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

@@ -1,0 +1,19 @@
+--- a/src/facer.c
++++ b/src/facer.c
+@@ -2792,6 +2792,8 @@
+ static int acer_predator_v4_toggle_turbo(void);
+ #endif
+ 
++static void ps_fan_turbo_changed(int on);
++
+ static void acer_toggle_turbo(void)
+ {
+ #if RTLNX_VER_MIN(6, 14, 0)
+@@ -2825,6 +2827,7 @@
+ 		WMID_gaming_set_u64(0x205, ACER_CAP_TURBO_OC);
+ 		WMID_gaming_set_u64(0x207, ACER_CAP_TURBO_OC);
+ 	}
++	ps_fan_turbo_changed(turbo_state);
+ }
+ 
+ #if RTLNX_VER_MIN(6, 14, 0)

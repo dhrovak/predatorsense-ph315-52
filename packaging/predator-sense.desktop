@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=PredatorSense
+Comment=Fans, turbo and keyboard lighting for Acer Predator
+Exec=predator-sense
+Icon=/opt/predator-sense/predator-sense.svg
+Terminal=false
+Categories=Settings;HardwareSettings;System;
+Keywords=fan;turbo;rgb;keyboard;acer;predator;
+StartupWMClass=predator-sense

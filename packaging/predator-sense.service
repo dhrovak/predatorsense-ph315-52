@@ -1,0 +1,20 @@
+[Unit]
+Description=PredatorSense fan, turbo and keyboard lighting service
+After=systemd-modules-load.service
+
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/predator-sense
+ExecStart=/usr/bin/python3 -m predator_sense daemon
+ExecStopPost=/usr/bin/python3 -m predator_sense reset
+Restart=on-failure
+RestartSec=2
+RuntimeDirectory=predator-sense
+StateDirectory=predator-sense
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
